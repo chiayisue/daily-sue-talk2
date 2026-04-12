@@ -104,42 +104,71 @@
     const statusText = document.getElementById('status');
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-        statusText.innerText = "❌ 你的瀏覽器不支援語音辨識，請換 Safari 或 Chrome";
-        statusText.style.color = "red";
-    }
-
     const recognition = new SpeechRecognition();
     recognition.lang = 'ko-KR';
-    recognition.interimResults = false;
+    recognition.interimResults = true; // 開啟即時辨識，邊說邊看結果
+    recognition.continuous = false;
+
+    let isRecording = false;
     const synth = window.speechSynthesis;
 
     micBtn.addEventListener('click', () => {
-        try {
+        if (!isRecording) {
             recognition.start();
+            isRecording = true;
             micBtn.classList.add('recording');
-            statusText.innerText = "🎤 正在聽... 請說韓文";
-        } catch (e) {
-            statusText.innerText = "❌ 啟動失敗：" + e.message;
+            statusText.innerText = "🎤 正在聽... 說完請再點一次按鈕結束";
+        } else {
+            recognition.stop(); // 手動停止，強制讓它跑出結果
+            isRecording = false;
+            micBtn.classList.remove('recording');
+            statusText.innerText = "⌛ 辨識中...";
         }
     });
 
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        addMessage(transcript, 'user');
-        processResponse(transcript);
-        micBtn.classList.remove('recording');
-        statusText.innerText = "✅ 辨識成功，點擊再次說話";
+        // 如果是最終結果才處理
+        if (event.results[0].isFinal) {
+            addMessage(transcript, 'user');
+            processResponse(transcript);
+            statusText.innerText = "✅ 點擊麥克風再次說話";
+        } else {
+            // 邊說邊顯示在狀態列，讓你知道它有聽到
+            statusText.innerText = "正在辨識：" + transcript;
+        }
     };
 
     recognition.onerror = (event) => {
+        isRecording = false;
         micBtn.classList.remove('recording');
-        statusText.innerText = "❌ 錯誤: " + event.error + " (請檢查麥克風權限)";
-        console.error(event.error);
+        statusText.innerText = "❌ 發生錯誤: " + event.error;
     };
 
-    // ... (其餘 addMessage, speak, processResponse 保持不變) ...
+    function addMessage(text, sender) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${sender}`;
+        msgDiv.innerText = text;
+        chatContainer.appendChild(msgDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        if (sender === 'ai') speak(text);
+    }
+
+    function speak(text) {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'ko-KR';
+        synth.speak(utter);
+    }
+
+    function processResponse(input) {
+        let feedback = "";
+        if (!input.includes('을') && !input.includes('를')) {
+            feedback = "（老師提醒：別忘了加上 을/를 喔！）";
+        }
+        setTimeout(() => {
+            addMessage("좋아요! \"" + input + "\" 라고 하셨네요. " + feedback, 'ai');
+        }, 800);
+    }
 </script>
 
 </body>
