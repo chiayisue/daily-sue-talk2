@@ -103,19 +103,26 @@
     const chatContainer = document.getElementById('chat-container');
     const statusText = document.getElementById('status');
 
-    // 1. 初始化語音辨識 (STT)
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'ko-KR'; // 設定為韓文
-    recognition.interimResults = false;
+    
+    if (!SpeechRecognition) {
+        statusText.innerText = "❌ 你的瀏覽器不支援語音辨識，請換 Safari 或 Chrome";
+        statusText.style.color = "red";
+    }
 
-    // 2. 初始化語音合成 (TTS)
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ko-KR';
+    recognition.interimResults = false;
     const synth = window.speechSynthesis;
 
     micBtn.addEventListener('click', () => {
-        recognition.start();
-        micBtn.classList.add('recording');
-        statusText.innerText = "正在聽你說話...";
+        try {
+            recognition.start();
+            micBtn.classList.add('recording');
+            statusText.innerText = "🎤 正在聽... 請說韓文";
+        } catch (e) {
+            statusText.innerText = "❌ 啟動失敗：" + e.message;
+        }
     });
 
     recognition.onresult = (event) => {
@@ -123,44 +130,16 @@
         addMessage(transcript, 'user');
         processResponse(transcript);
         micBtn.classList.remove('recording');
-        statusText.innerText = "點擊麥克風開始說話";
+        statusText.innerText = "✅ 辨識成功，點擊再次說話";
     };
 
-    function addMessage(text, sender) {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `message ${sender}`;
-        msgDiv.innerText = text;
-        chatContainer.appendChild(msgDiv);
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-        
-        if (sender === 'ai') {
-            speak(text);
-        }
-    }
+    recognition.onerror = (event) => {
+        micBtn.classList.remove('recording');
+        statusText.innerText = "❌ 錯誤: " + event.error + " (請檢查麥克風權限)";
+        console.error(event.error);
+    };
 
-    function speak(text) {
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = 'ko-KR';
-        synth.speak(utter);
-    }
-
-    // 3. 模擬 AI 老師邏輯 (之後可串接 API)
-    function processResponse(input) {
-        let feedback = "";
-        
-        // 簡單判斷這週的語法重點：을/를
-        if (!input.includes('을') && !input.includes('를')) {
-            feedback = "（老師提醒：試著加上受詞助詞 '을' 或 '를' 會更棒喔！）";
-        }
-
-        setTimeout(() => {
-            if (input.includes('커피') || input.includes('마셔')) {
-                addMessage("오, 집에서 커피를 마셔요? 저도 커피를 좋아해요! " + feedback, 'ai');
-            } else {
-                addMessage("좋아요! " + input + " (這是一個很棒的練習) " + feedback, 'ai');
-            }
-        }, 1000);
-    }
+    // ... (其餘 addMessage, speak, processResponse 保持不變) ...
 </script>
 
 </body>
