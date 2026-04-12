@@ -106,43 +106,53 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = 'ko-KR';
-    recognition.interimResults = true; // 開啟即時辨識，邊說邊看結果
+    recognition.interimResults = true; 
     recognition.continuous = false;
 
     let isRecording = false;
+    let currentTranscript = ""; // 新增：用來儲存目前聽到的字
     const synth = window.speechSynthesis;
 
     micBtn.addEventListener('click', () => {
         if (!isRecording) {
+            currentTranscript = ""; // 重置
             recognition.start();
             isRecording = true;
             micBtn.classList.add('recording');
-            statusText.innerText = "🎤 正在聽... 說完請再點一次按鈕結束";
+            statusText.innerText = "🎤 正在聽... 說完請再點一次按鈕";
         } else {
-            recognition.stop(); // 手動停止，強制讓它跑出結果
+            recognition.stop(); 
             isRecording = false;
             micBtn.classList.remove('recording');
-            statusText.innerText = "⌛ 辨識中...";
+            
+            // 強制執行：如果辨識到了字，就直接送出
+            if (currentTranscript !== "") {
+                handleFinalResult(currentTranscript);
+            } else {
+                statusText.innerText = "❌ 沒聽到聲音，請再試一次";
+            }
         }
     });
 
     recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        // 如果是最終結果才處理
-        if (event.results[0].isFinal) {
-            addMessage(transcript, 'user');
-            processResponse(transcript);
-            statusText.innerText = "✅ 點擊麥克風再次說話";
-        } else {
-            // 邊說邊顯示在狀態列，讓你知道它有聽到
-            statusText.innerText = "正在辨識：" + transcript;
-        }
+        // 抓取目前最準確的那句辨識結果
+        currentTranscript = Array.from(event.results)
+            .map(result => result[0].transcript)
+            .join('');
+            
+        statusText.innerText = "正在辨識：" + currentTranscript;
     };
+
+    function handleFinalResult(text) {
+        addMessage(text, 'user');
+        processResponse(text);
+        statusText.innerText = "✅ 辨識成功";
+    }
 
     recognition.onerror = (event) => {
         isRecording = false;
         micBtn.classList.remove('recording');
-        statusText.innerText = "❌ 發生錯誤: " + event.error;
+        statusText.innerText = "❌ 錯誤: " + event.error;
     };
 
     function addMessage(text, sender) {
@@ -162,12 +172,15 @@
 
     function processResponse(input) {
         let feedback = "";
+        // 檢查助詞 을/를
         if (!input.includes('을') && !input.includes('를')) {
-            feedback = "（老師提醒：別忘了加上 을/를 喔！）";
+            feedback = "\n(提醒：試著加上 을/를 會更精準喔！)";
         }
+        
         setTimeout(() => {
-            addMessage("좋아요! \"" + input + "\" 라고 하셨네요. " + feedback, 'ai');
-        }, 800);
+            let reply = "좋아요! \"" + input + "\" 라고 하셨네요." + feedback;
+            addMessage(reply, 'ai');
+        }, 600);
     }
 </script>
 
